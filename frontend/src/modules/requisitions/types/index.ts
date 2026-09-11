@@ -5,15 +5,6 @@ export * from './CreateRequisitionWebRequest';
 export * from './UpdateRequisitionWebRequest';
 export * from './RequisitionSearchWebRequest';
 export * from './RequisitionWebResponse';
+export * from './Requisition';
 export * from './RequisitionListItem';
-
-export type RequisitionFilterTab = 'ALL' | 'PENDING' | 'APPROVED' | 'CONVERTED' | 'DRAFT';
-
-export interface RequisitionStats {
-  total: number;
-  pendingReview: number;
-  readyForPo: number;
-  converted: number;
-  totalEstimatedValue: number;
-  currency: string;
-}
+export * from './requisition.types';
