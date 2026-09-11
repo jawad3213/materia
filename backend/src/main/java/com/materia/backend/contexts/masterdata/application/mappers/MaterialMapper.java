@@ -209,6 +209,13 @@ public class MaterialMapper implements BaseMapper<Material, CreateMaterialInput,
         response.setDescription(entity.getDescription());
         response.setAlternativeName(entity.getAlternativeName());
         response.setSearchKeywords(entity.getSearchKeywords());
+        response.setStockStatus(entity.getStockStatus() != null ? entity.getStockStatus().getCode() : null);
+        response.setStockOnOrder(entity.getStockOnOrder());
+        response.setReorderPoint(entity.getReorderPoint());
+        response.setSafetyStock(entity.getSafetyStock());
+        response.setIsBelowMinimumStock(entity.isBelowMinimumStock());
+        response.setIsReorderNeeded(entity.isBelowReorderPoint());
+        response.setIsOutOfStock(entity.isOutOfStock());
         return response;
     }
 
