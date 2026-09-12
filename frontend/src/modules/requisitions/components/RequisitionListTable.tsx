@@ -20,7 +20,6 @@ import type {
 import RequisitionStatusBadge from "./RequisitionStatusBadge";
 import RequisitionStatCards from "./RequisitionStatCards";
 import RequisitionFilters from "./RequisitionFilters";
-import RequisitionApprovalModal from "./RequisitionApprovalModal";
 
 export default function RequisitionListTable() {
   const [requisitions, setRequisitions] = useState<Requisition[]>([]);
@@ -32,17 +31,6 @@ export default function RequisitionListTable() {
   const [requisitionToDelete, setRequisitionToDelete] =
     useState<Requisition | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-
-  // Approval / Rejection modal state
-  const [approvalModalState, setApprovalModalState] = useState<{
-    isOpen: boolean;
-    requisition: Requisition | null;
-    mode: "APPROVE" | "REJECT";
-  }>({
-    isOpen: false,
-    requisition: null,
-    mode: "APPROVE",
-  });
 
   // Convert to PO modal state
   const [convertToPoRequisition, setConvertToPoRequisition] =
@@ -280,29 +268,6 @@ export default function RequisitionListTable() {
   };
 
   // Workflow Handlers
-  const handleApproveOrRejectConfirm = async (notesOrReason: string) => {
-    const { requisition, mode } = approvalModalState;
-    if (!requisition) return;
-
-    if (mode === "APPROVE") {
-      await requisitionApi.approve(
-        requisition.id,
-        "current-approver",
-        "Approver",
-        notesOrReason
-      );
-    } else {
-      await requisitionApi.reject(
-        requisition.id,
-        notesOrReason,
-        "current-approver",
-        "Approver"
-      );
-    }
-
-    setRefreshTrigger((prev) => prev + 1);
-  };
-
   const handleQuickSubmit = async (requisition: Requisition) => {
     try {
       setLoading(true);
@@ -526,6 +491,37 @@ export default function RequisitionListTable() {
                 />
               </svg>
             </Button>
+
+            {/* Approvals Portal Link (Dedicated Page for Manager Approvals) */}
+            <Link to="/requisitions/approvals">
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-amber-300 text-amber-700 bg-amber-50/60 hover:bg-amber-100 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300"
+              >
+                <span className="flex items-center gap-1.5">
+                  <svg
+                    className="size-4 text-amber-600 dark:text-amber-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                  Approvals Portal
+                  {statCounts.pendingReview > 0 && (
+                    <span className="ml-1 px-1.5 py-0.2 rounded-full bg-amber-500 text-white text-[10px] font-bold">
+                      {statCounts.pendingReview}
+                    </span>
+                  )}
+                </span>
+              </Button>
+            </Link>
 
             {/* Create New Requisition */}
             <Link to="/requisitions/create">
@@ -816,43 +812,6 @@ export default function RequisitionListTable() {
                         {/* Contextual Quick Actions */}
                         <TableCell className="px-4 py-3.5 text-right">
                           <div className="flex items-center justify-end gap-1">
-                            {/* If Pending Review: Quick Approve & Reject Buttons */}
-                            {isPending && (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setApprovalModalState({
-                                      isOpen: true,
-                                      requisition: req,
-                                      mode: "APPROVE",
-                                    })
-                                  }
-                                  className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-500/15 transition-colors"
-                                  title="Approve Requisition"
-                                >
-                                  <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                  </svg>
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setApprovalModalState({
-                                      isOpen: true,
-                                      requisition: req,
-                                      mode: "REJECT",
-                                    })
-                                  }
-                                  className="p-1.5 rounded-lg text-red-600 hover:bg-red-50 dark:hover:bg-red-500/15 transition-colors"
-                                  title="Reject Requisition"
-                                >
-                                  <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                  </svg>
-                                </button>
-                              </>
-                            )}
 
                             {/* If Approved: Convert to Purchase Order Button */}
                             {isApproved && (
@@ -1012,17 +971,6 @@ export default function RequisitionListTable() {
           )}
         </div>
       </div>
-
-      {/* Approval / Rejection Modal */}
-      <RequisitionApprovalModal
-        isOpen={approvalModalState.isOpen}
-        onClose={() =>
-          setApprovalModalState((prev) => ({ ...prev, isOpen: false }))
-        }
-        requisition={approvalModalState.requisition}
-        mode={approvalModalState.mode}
-        onConfirm={handleApproveOrRejectConfirm}
-      />
 
       {/* Convert to PO Confirmation Modal */}
       {convertToPoRequisition && (

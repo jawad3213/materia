@@ -15,6 +15,8 @@ export default function AppRoutes() {
       <Route path="/suppliers/*" element={<SuppliersRoutes />} />
       <Route path="/requisitions/*" element={<RequisitionsRoutes />} />
       <Route path="/purchase-requisitions/*" element={<RequisitionsRoutes />} />
+      <Route path="/approvals" element={<Navigate to="/requisitions/approvals" replace />} />
+      <Route path="/approvals/*" element={<Navigate to="/requisitions/approvals" replace />} />
     </Routes>
   );
 }

@@ -10,3 +10,5 @@ export { default as RequisitionStatusBadge } from "./components/RequisitionStatu
 export { default as RequisitionStatCards } from "./components/RequisitionStatCards";
 export { default as RequisitionFilters } from "./components/RequisitionFilters";
 export { default as RequisitionApprovalModal } from "./components/RequisitionApprovalModal";
+export { default as RequisitionApprovalsPage } from "./pages/RequisitionApprovalsPage";
+export { default as RequisitionApprovalsTable } from "./components/RequisitionApprovalsTable";
