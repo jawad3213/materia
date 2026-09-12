@@ -8,12 +8,13 @@ export interface CreateRequisitionWebRequest {
   title: string;
   description?: string;
   justification?: string;
-  requesterId: string;
+  requesterId?: string;
   requesterName: string;
   requiredDate?: string;
   currencyCode?: string;
   lines: RequisitionLineWebRequest[];
-  createdBy: string;
+  createdBy?: string;
+  status?: 'DRAFT' | 'SUBMITTED' | string;
 }
 
 // Alias for standard usage across frontend forms

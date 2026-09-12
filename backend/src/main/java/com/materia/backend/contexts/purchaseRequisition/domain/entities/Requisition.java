@@ -1,12 +1,12 @@
 package com.materia.backend.contexts.purchaseRequisition.domain.entities;
 
 import com.materia.backend.common.domain.BaseEntity;
-import com.materia.backend.contexts.masterData.domain.enums.CurrencyCode;
+import com.materia.backend.common.domain.enums.CurrencyCode;
 import com.materia.backend.contexts.purchaseRequisition.domain.enums.RequisitionStatus;
 import com.materia.backend.contexts.purchaseRequisition.domain.exceptions.RequisitionCurrencyMismatchException;
 import com.materia.backend.contexts.purchaseRequisition.domain.exceptions.RequisitionInvalidStatusTransitionException;
 import com.materia.backend.contexts.purchaseRequisition.domain.valueObjects.RequisitionCode;
-import com.materia.backend.contexts.masterData.domain.valueObjects.Money;
+import com.materia.backend.common.domain.valueObjects.Money;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -781,9 +781,9 @@ public class Requisition extends BaseEntity {
      * Approuve la demande
      */
     public void approve(String approverId, String approverName, String notes) {
-        if (status != RequisitionStatus.SUBMITTED && status != RequisitionStatus.UNDER_REVIEW) {
+        if (status != RequisitionStatus.SUBMITTED) {
             throw new RequisitionInvalidStatusTransitionException(
-                    "Only submitted or under-review requisitions can be approved"
+                    "Only submitted requisitions can be approved"
             );
         }
         this.status = RequisitionStatus.APPROVED;
@@ -799,9 +799,9 @@ public class Requisition extends BaseEntity {
      * Rejette la demande
      */
     public void reject(String approverId, String approverName, String reason) {
-        if (status != RequisitionStatus.SUBMITTED && status != RequisitionStatus.UNDER_REVIEW) {
+        if (status != RequisitionStatus.SUBMITTED) {
             throw new RequisitionInvalidStatusTransitionException(
-                    "Only submitted or under-review requisitions can be rejected"
+                    "Only submitted requisitions can be rejected"
             );
         }
         this.status = RequisitionStatus.REJECTED;
@@ -812,22 +812,15 @@ public class Requisition extends BaseEntity {
         this.setUpdatedBy(approverId);
     }
 
-    /**
-     * Annule la demande
-     */
-    public void cancel(String userId, String reason) {
-        if (!status.isCancellable()) {
-            throw new RequisitionInvalidStatusTransitionException("This requisition cannot be cancelled");
-        }
-        this.status = RequisitionStatus.CANCELLED;
-        this.setUpdatedAt(LocalDateTime.now());
-        this.setUpdatedBy(userId);
-    }
+
 
     /**
      * Convertit la demande en commande
      */
     public void convert(String purchaseOrderId, String purchaseOrderCode, String userId) {
+        if (status == RequisitionStatus.REJECTED) {
+            throw new RequisitionInvalidStatusTransitionException("Cannot convert a rejected requisition to a purchase order");
+        }
         if (status != RequisitionStatus.APPROVED) {
             throw new RequisitionInvalidStatusTransitionException("Only approved requisitions can be converted");
         }
@@ -872,7 +865,7 @@ public class Requisition extends BaseEntity {
         return requiredDate != null &&
                 requiredDate.isBefore(LocalDate.now()) &&
                 status != RequisitionStatus.CONVERTED &&
-                status != RequisitionStatus.CANCELLED;
+                status != RequisitionStatus.REJECTED;
     }
 
     /**

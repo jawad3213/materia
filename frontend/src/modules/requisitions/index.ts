@@ -3,6 +3,8 @@ export * from "./services/requisitionApi";
 export * from "./services/requisitionService";
 export { default as RequisitionsRoutes } from "./RequisitionsRoutes";
 export { default as RequisitionsPage } from "./pages/RequisitionsPage";
+export { default as CreateRequisitionPage } from "./pages/CreateRequisitionPage";
+export { default as CreateRequisitionForm } from "./components/CreateRequisitionForm";
 export { default as RequisitionListTable } from "./components/RequisitionListTable";
 export { default as RequisitionStatusBadge } from "./components/RequisitionStatusBadge";
 export { default as RequisitionStatCards } from "./components/RequisitionStatCards";

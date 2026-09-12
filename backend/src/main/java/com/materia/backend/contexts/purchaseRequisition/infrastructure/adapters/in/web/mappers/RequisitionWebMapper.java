@@ -99,6 +99,7 @@ public class RequisitionWebMapper implements BaseWebMapper<
         line.setId(webLine.getId());
         line.setMaterialId(webLine.getMaterialId());
         line.setMaterialCode(webLine.getMaterialCode());
+        line.setMaterialName(webLine.getMaterialName());
         line.setQuantity(webLine.getQuantity());
         line.setRequiredDate(webLine.getRequiredDate());
         line.setSupplierId(webLine.getSupplierId());

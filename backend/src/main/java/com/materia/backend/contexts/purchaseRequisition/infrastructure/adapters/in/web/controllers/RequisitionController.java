@@ -148,15 +148,6 @@ public class RequisitionController {
         return ResponseEntity.ok(webMapper.toWebResponse(response));
     }
 
-    @PatchMapping("/{id}/cancel")
-    public ResponseEntity<RequisitionWebResponse> cancelRequisition(
-            @PathVariable UUID id,
-            @RequestParam String userId,
-            @RequestParam(required = false) String reason) {
-        RequisitionOutput response = requisitionUseCase.cancel(id, userId, reason);
-        return ResponseEntity.ok(webMapper.toWebResponse(response));
-    }
-
     @PatchMapping("/{id}/convert")
     public ResponseEntity<RequisitionWebResponse> convertRequisition(
             @PathVariable UUID id,

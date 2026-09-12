@@ -24,7 +24,6 @@ public class CreateRequisitionWebRequest {
     @Size(max = 500, message = "Justification must not exceed 500 characters")
     private String justification;
 
-    @NotBlank(message = "Requester ID is mandatory")
     private String requesterId;
 
     @NotBlank(message = "Requester name is mandatory")
@@ -40,8 +39,8 @@ public class CreateRequisitionWebRequest {
     @Valid
     private List<RequisitionLineWebRequest> lines = new ArrayList<>();
 
-    @NotBlank(message = "Created by is mandatory")
     private String createdBy;
+    private String status;
 
     public String getTitle() {
         return title;
@@ -113,5 +112,13 @@ public class CreateRequisitionWebRequest {
 
     public void setCreatedBy(String createdBy) {
         this.createdBy = createdBy;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
     }
 }

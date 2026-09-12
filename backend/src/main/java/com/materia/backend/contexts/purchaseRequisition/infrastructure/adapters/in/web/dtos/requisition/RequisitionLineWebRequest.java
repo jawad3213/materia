@@ -19,6 +19,9 @@ public class RequisitionLineWebRequest {
     @Size(max = 50, message = "Material code must not exceed 50 characters")
     private String materialCode;
 
+    @Size(max = 255, message = "Material name must not exceed 255 characters")
+    private String materialName;
+
     @NotNull(message = "Quantity is mandatory")
     @Positive(message = "Quantity must be greater than zero")
     private Integer quantity;
@@ -138,5 +141,13 @@ public class RequisitionLineWebRequest {
 
     public void setExpiryDate(LocalDate expiryDate) {
         this.expiryDate = expiryDate;
+    }
+
+    public String getMaterialName() {
+        return materialName;
+    }
+
+    public void setMaterialName(String materialName) {
+        this.materialName = materialName;
     }
 }

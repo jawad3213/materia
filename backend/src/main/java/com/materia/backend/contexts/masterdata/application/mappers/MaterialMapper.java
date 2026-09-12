@@ -4,11 +4,11 @@ import com.materia.backend.contexts.masterData.application.dtos.material.CreateM
 import com.materia.backend.contexts.masterData.application.dtos.material.MaterialOutput;
 import com.materia.backend.contexts.masterData.application.dtos.material.UpdateMaterialInput;
 import com.materia.backend.contexts.masterData.domain.entities.Material;
-import com.materia.backend.contexts.masterData.domain.enums.CurrencyCode;
+import com.materia.backend.common.domain.enums.CurrencyCode;
 import com.materia.backend.contexts.masterData.domain.enums.MaterialType;
 import com.materia.backend.contexts.masterData.domain.enums.MaterialStatus;
 import com.materia.backend.contexts.masterData.domain.enums.UnitOfMeasure;
-import com.materia.backend.contexts.masterData.domain.valueObjects.Money;
+import com.materia.backend.common.domain.valueObjects.Money;
 import org.springframework.stereotype.Component;
 
 import java.util.List;

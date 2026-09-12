@@ -89,7 +89,7 @@ public class RequisitionJpaEntity extends BaseJpaEntity {
     @Column(name = "purchase_order_code", length = 100)
     private String purchaseOrderCode;
 
-    @OneToMany(mappedBy = "requisition", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "requisition", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @OrderBy("lineNumber ASC")
     private List<RequisitionLineJpaEntity> lines = new ArrayList<>();
 
