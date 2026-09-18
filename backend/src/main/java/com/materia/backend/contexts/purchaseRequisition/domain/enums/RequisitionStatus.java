@@ -13,6 +13,7 @@ public enum RequisitionStatus {
     SUBMITTED("SUBMITTED", "Submitted", "Requisition submitted for processing", "#2563eb"),
     APPROVED("APPROVED", "Approved", "Requisition approved for conversion", "#22c55e"),
     REJECTED("REJECTED", "Rejected", "Requisition rejected", "#ef4444"),
+    CANCELLED("CANCELLED", "Cancelled", "Requisition cancelled", "#6b7280"),
     CONVERTED("CONVERTED", "Converted", "Requisition converted to purchase order", "#8b5cf6");
 
     private final String code;
@@ -67,7 +68,7 @@ public enum RequisitionStatus {
     }
 
     public static List<RequisitionStatus> getModifiableStatuses() {
-        return List.of(DRAFT);
+        return List.of(DRAFT, SUBMITTED);
     }
 
     public static List<RequisitionStatus> getConvertibleStatuses() {
@@ -76,6 +77,14 @@ public enum RequisitionStatus {
 
     public static List<RequisitionStatus> getValidatableStatuses() {
         return List.of(SUBMITTED);
+    }
+
+    public static List<RequisitionStatus> getDeletableStatuses() {
+        return List.of(DRAFT, REJECTED, CANCELLED);
+    }
+
+    public static List<RequisitionStatus> getCancellableStatuses() {
+        return List.of(DRAFT, SUBMITTED, APPROVED);
     }
 
     public boolean isModifiable() {
@@ -90,12 +99,28 @@ public enum RequisitionStatus {
         return getValidatableStatuses().contains(this);
     }
 
-    public boolean isTerminal() {
-        return CONVERTED.equals(this) || REJECTED.equals(this);
+    public boolean isDeletable() {
+        return getDeletableStatuses().contains(this);
     }
 
-    public boolean isDeletable() {
+    public boolean isCancellable() {
+        return getCancellableStatuses().contains(this);
+    }
+
+    public boolean isSubmittable() {
         return DRAFT.equals(this);
+    }
+
+    public boolean isApprovable() {
+        return SUBMITTED.equals(this);
+    }
+
+    public boolean isRejectable() {
+        return SUBMITTED.equals(this);
+    }
+
+    public boolean isTerminal() {
+        return CONVERTED.equals(this) || REJECTED.equals(this) || CANCELLED.equals(this);
     }
 
     public boolean isActive() {
@@ -103,7 +128,7 @@ public enum RequisitionStatus {
     }
 
     public boolean isFinal() {
-        return CONVERTED.equals(this) || REJECTED.equals(this);
+        return CONVERTED.equals(this) || REJECTED.equals(this) || CANCELLED.equals(this);
     }
 }
 

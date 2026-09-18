@@ -49,6 +49,7 @@ public class Requisition extends BaseEntity {
     private LocalDate submittedDate;
     private LocalDate approvedDate;
     private LocalDate convertedDate;
+    private LocalDate cancelledDate;
 
     // ---- FINANCES ----
     private Money totalAmount;
@@ -59,6 +60,7 @@ public class Requisition extends BaseEntity {
     private String approverName;
     private String rejectionReason;
     private String approvalNotes;
+    private String cancellationReason;
 
     // ---- COMMANDE ----
     private String purchaseOrderId;
@@ -96,6 +98,7 @@ public class Requisition extends BaseEntity {
         this.submittedDate = builder.submittedDate;
         this.approvedDate = builder.approvedDate;
         this.convertedDate = builder.convertedDate;
+        this.cancelledDate = builder.cancelledDate;
 
         this.totalAmount = builder.totalAmount;
         this.currencyCode = builder.currencyCode;
@@ -104,6 +107,7 @@ public class Requisition extends BaseEntity {
         this.approverName = builder.approverName;
         this.rejectionReason = builder.rejectionReason;
         this.approvalNotes = builder.approvalNotes;
+        this.cancellationReason = builder.cancellationReason;
 
         this.purchaseOrderId = builder.purchaseOrderId;
         this.purchaseOrderCode = builder.purchaseOrderCode;
@@ -212,6 +216,22 @@ public class Requisition extends BaseEntity {
         this.convertedDate = convertedDate;
     }
 
+    public LocalDate getCancelledDate() {
+        return cancelledDate;
+    }
+
+    public void setCancelledDate(LocalDate cancelledDate) {
+        this.cancelledDate = cancelledDate;
+    }
+
+    public String getCancellationReason() {
+        return cancellationReason;
+    }
+
+    public void setCancellationReason(String cancellationReason) {
+        this.cancellationReason = cancellationReason;
+    }
+
     public Money getTotalAmount() {
         return totalAmount;
     }
@@ -308,14 +328,18 @@ public class Requisition extends BaseEntity {
         private LocalDate submittedDate;
         private LocalDate approvedDate;
         private LocalDate convertedDate;
+        private LocalDate cancelledDate;
 
+        // Financement
         private Money totalAmount;
-        private String currencyCode = "MAD";
+        private String currencyCode;
 
+        // Approbation
         private String approverId;
         private String approverName;
         private String rejectionReason;
         private String approvalNotes;
+        private String cancellationReason;
 
         private String purchaseOrderId;
         private String purchaseOrderCode;
@@ -415,6 +439,16 @@ public class Requisition extends BaseEntity {
 
         public Builder convertedDate(LocalDate convertedDate) {
             this.convertedDate = convertedDate;
+            return this;
+        }
+
+        public Builder cancelledDate(LocalDate cancelledDate) {
+            this.cancelledDate = cancelledDate;
+            return this;
+        }
+
+        public Builder cancellationReason(String cancellationReason) {
+            this.cancellationReason = cancellationReason;
             return this;
         }
 
@@ -832,6 +866,20 @@ public class Requisition extends BaseEntity {
         this.setUpdatedBy(userId);
     }
 
+    /**
+     * Annule la demande
+     */
+    public void cancel(String userId, String reason) {
+        if (!isCancellable()) {
+            throw new RequisitionInvalidStatusTransitionException("This requisition cannot be cancelled in status: " + status);
+        }
+        this.status = RequisitionStatus.CANCELLED;
+        this.cancellationReason = reason;
+        this.cancelledDate = LocalDate.now();
+        this.setUpdatedAt(LocalDateTime.now());
+        this.setUpdatedBy(userId);
+    }
+
     // ============================================================
     // DOMAINE BEHAVIOR - VÉRIFICATIONS
     // ============================================================
@@ -855,6 +903,34 @@ public class Requisition extends BaseEntity {
      */
     public boolean isDeletable() {
         return status != null && status.isDeletable();
+    }
+
+    /**
+     * Vérifie si la demande peut être annulée
+     */
+    public boolean isCancellable() {
+        return status != null && status.isCancellable();
+    }
+
+    /**
+     * Vérifie si la demande peut être soumise
+     */
+    public boolean isSubmittable() {
+        return status != null && status.isSubmittable();
+    }
+
+    /**
+     * Vérifie si la demande peut être approuvée
+     */
+    public boolean isApprovable() {
+        return status != null && status.isApprovable();
+    }
+
+    /**
+     * Vérifie si la demande peut être rejetée
+     */
+    public boolean isRejectable() {
+        return status != null && status.isRejectable();
     }
 
 

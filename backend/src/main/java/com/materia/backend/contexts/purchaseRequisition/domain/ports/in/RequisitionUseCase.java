@@ -32,4 +32,6 @@ public interface RequisitionUseCase extends BaseUseCase<CreateRequisitionInput, 
     RequisitionOutput reject(UUID id, String approverId, String approverName, String reason);
 
     RequisitionOutput convert(UUID id, String purchaseOrderId, String purchaseOrderCode, String userId);
+
+    RequisitionOutput cancel(UUID id, String userId, String reason);
 }

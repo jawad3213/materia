@@ -14,36 +14,70 @@ const DEFAULT_EUR_RATES: Record<string, number> = {
  * Converts amount from any currency (from) to any currency (to).
  */
 export function convertCurrency(
-  amount: number,
-  from: string,
-  to: string,
+  amount: number | string | undefined | null,
+  from: string | undefined | null,
+  to: string | undefined | null,
   eurRates: Record<string, number> = DEFAULT_EUR_RATES
 ): { converted: number; rate: number; isConverted: boolean } {
-  if (!amount || isNaN(amount) || amount === 0) {
+  const parseNum = (val: unknown): number => {
+    if (val === undefined || val === null) return 0;
+    if (typeof val === 'number') return isNaN(val) ? 0 : val;
+    let str = String(val).replace(/[^0-9.,-]+/g, '');
+    if (str.includes(',') && str.includes('.')) {
+      if (str.indexOf(',') < str.indexOf('.')) {
+        str = str.replace(/,/g, '');
+      } else {
+        str = str.replace(/\./g, '').replace(/,/g, '.');
+      }
+    } else if (str.includes(',')) {
+      str = str.replace(/,/g, '.');
+    }
+    const n = parseFloat(str);
+    return isNaN(n) ? 0 : n;
+  };
+
+  const numAmount = parseNum(amount);
+
+  if (numAmount === 0 || isNaN(numAmount)) {
     return { converted: 0, rate: 1, isConverted: false };
   }
 
-  const cleanFrom = (from || 'MAD').toUpperCase().trim();
-  const cleanTo = (to || 'MAD').toUpperCase().trim();
+  const normalizeCurrency = (code: string | undefined | null): string => {
+    if (!code) return 'MAD';
+    const clean = String(code).toUpperCase().trim();
+    if (clean === 'DH' || clean.includes('DIRHAM') || clean.includes('MAD')) return 'MAD';
+    if (clean === '€' || clean.includes('EUR') || clean.includes('â‚¬') || clean.includes('\u20AC')) return 'EUR';
+    if (clean === '$' || clean.includes('USD')) return 'USD';
+    return clean;
+  };
+
+  const cleanFrom = normalizeCurrency(from);
+  const cleanTo = normalizeCurrency(to);
 
   if (cleanFrom === cleanTo) {
-    return { converted: amount, rate: 1, isConverted: false };
+    return { converted: numAmount, rate: 1, isConverted: false };
   }
 
   const eurToFrom = eurRates[cleanFrom] ?? DEFAULT_EUR_RATES[cleanFrom] ?? 1.0;
   const eurToTarget = eurRates[cleanTo] ?? DEFAULT_EUR_RATES[cleanTo] ?? 1.0;
 
-  if (eurToFrom <= 0) {
-    return { converted: amount, rate: 1, isConverted: false };
+  if (!eurToFrom || eurToFrom <= 0 || isNaN(eurToFrom)) {
+    return { converted: numAmount, rate: 1, isConverted: false };
+  }
+  if (!eurToTarget || eurToTarget <= 0 || isNaN(eurToTarget)) {
+    return { converted: numAmount, rate: 1, isConverted: false };
   }
 
   // 1 unit of 'from' in 'to'
   const unitRate = eurToTarget / eurToFrom;
-  const converted = Math.round(amount * unitRate * 100) / 100;
+  const rawConverted = numAmount * unitRate;
+  const converted = isNaN(rawConverted)
+    ? numAmount
+    : Math.round(rawConverted * 100) / 100;
 
   return {
-    converted,
-    rate: Math.round(unitRate * 10000) / 10000,
+    converted: isNaN(converted) ? numAmount : converted,
+    rate: isNaN(unitRate) ? 1 : Math.round(unitRate * 10000) / 10000,
     isConverted: true,
   };
 }
@@ -91,7 +125,7 @@ export function useCurrencyConverter(targetCurrency: string = 'MAD') {
    * Converts an amount from source currency into target currency.
    */
   const convertToTarget = useCallback(
-    (amount: number, fromCurrency: string, customTarget?: string) => {
+    (amount: number | string | undefined | null, fromCurrency: string | undefined | null, customTarget?: string) => {
       const target = customTarget || targetCurrency || 'MAD';
       return convertCurrency(amount, fromCurrency, target, eurRates);
     },
@@ -103,7 +137,7 @@ export function useCurrencyConverter(targetCurrency: string = 'MAD') {
     currencies,
     isLoadingRates: isLoading,
     convertToTarget,
-    convertCurrency: (amount: number, from: string, to: string) =>
+    convertCurrency: (amount: number | string | undefined | null, from: string | undefined | null, to: string | undefined | null) =>
       convertCurrency(amount, from, to, eurRates),
   };
 }

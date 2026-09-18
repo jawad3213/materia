@@ -65,6 +65,9 @@ public class RequisitionJpaEntity extends BaseJpaEntity {
     @Column(name = "converted_date")
     private LocalDate convertedDate;
 
+    @Column(name = "cancelled_date")
+    private LocalDate cancelledDate;
+
     @Column(name = "total_amount", precision = 19, scale = 4)
     private BigDecimal totalAmount;
 
@@ -82,6 +85,9 @@ public class RequisitionJpaEntity extends BaseJpaEntity {
 
     @Column(name = "approval_notes", length = 1000)
     private String approvalNotes;
+
+    @Column(name = "cancellation_reason", length = 1000)
+    private String cancellationReason;
 
     @Column(name = "purchase_order_id", length = 100)
     private String purchaseOrderId;
@@ -181,6 +187,14 @@ public class RequisitionJpaEntity extends BaseJpaEntity {
         this.convertedDate = convertedDate;
     }
 
+    public LocalDate getCancelledDate() {
+        return cancelledDate;
+    }
+
+    public void setCancelledDate(LocalDate cancelledDate) {
+        this.cancelledDate = cancelledDate;
+    }
+
     public BigDecimal getTotalAmount() {
         return totalAmount;
     }
@@ -227,6 +241,14 @@ public class RequisitionJpaEntity extends BaseJpaEntity {
 
     public void setApprovalNotes(String approvalNotes) {
         this.approvalNotes = approvalNotes;
+    }
+
+    public String getCancellationReason() {
+        return cancellationReason;
+    }
+
+    public void setCancellationReason(String cancellationReason) {
+        this.cancellationReason = cancellationReason;
     }
 
     public String getPurchaseOrderId() {

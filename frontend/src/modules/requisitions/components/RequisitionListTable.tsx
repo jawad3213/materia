@@ -20,6 +20,7 @@ import type {
 import RequisitionStatusBadge from "./RequisitionStatusBadge";
 import RequisitionStatCards from "./RequisitionStatCards";
 import RequisitionFilters from "./RequisitionFilters";
+import RequisitionCancelModal from "./RequisitionCancelModal";
 
 export default function RequisitionListTable() {
   const [requisitions, setRequisitions] = useState<Requisition[]>([]);
@@ -36,6 +37,11 @@ export default function RequisitionListTable() {
   const [convertToPoRequisition, setConvertToPoRequisition] =
     useState<Requisition | null>(null);
   const [isConverting, setIsConverting] = useState(false);
+
+  // Cancel modal state
+  const [requisitionToCancel, setRequisitionToCancel] =
+    useState<Requisition | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
 
   // Search & Filter state
   const [searchKeyword, setSearchKeyword] = useState("");
@@ -316,15 +322,51 @@ export default function RequisitionListTable() {
     }
   };
 
+  const handleCancelConfirm = async (reason: string) => {
+    if (!requisitionToCancel) return;
+    try {
+      setIsCancelling(true);
+      await requisitionApi.cancel(requisitionToCancel.id, "current-user", reason);
+      setRequisitionToCancel(null);
+      setRefreshTrigger((prev) => prev + 1);
+    } catch (err) {
+      console.error("Failed to cancel requisition:", err);
+    } finally {
+      setIsCancelling(false);
+    }
+  };
+
   const formatAmount = (amt: string | number, curr = "MAD") => {
-    const num =
-      typeof amt === "number"
-        ? amt
-        : parseFloat(String(amt || "0").replace(/[^0-9.-]+/g, "")) || 0;
+    if (amt === undefined || amt === null) return `0.00 ${curr}`;
+    const str = String(amt).trim();
+    let detectedCurr = curr;
+    if (!curr || curr === "MAD") {
+      const upper = str.toUpperCase();
+      if (upper.includes("EUR") || upper.includes("€") || upper.includes("â‚¬") || upper.includes("\u20AC")) {
+        detectedCurr = "EUR";
+      } else if (upper.includes("USD") || upper.includes("$")) {
+        detectedCurr = "USD";
+      } else if (upper.includes("MAD") || upper.includes("DH") || upper.includes("DIRHAM")) {
+        detectedCurr = "MAD";
+      }
+    }
+
+    let cleaned = str.replace(/[^0-9.,-]+/g, "");
+    if (cleaned.includes(",") && cleaned.includes(".")) {
+      if (cleaned.indexOf(",") < cleaned.indexOf(".")) {
+        cleaned = cleaned.replace(/,/g, "");
+      } else {
+        cleaned = cleaned.replace(/\./g, "").replace(/,/g, ".");
+      }
+    } else if (cleaned.includes(",")) {
+      cleaned = cleaned.replace(/,/g, ".");
+    }
+    const num = parseFloat(cleaned);
+    const validNum = isNaN(num) ? 0 : num;
     return `${new Intl.NumberFormat("en-US", {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
-    }).format(num)} ${curr}`;
+    }).format(validNum)} ${detectedCurr}`;
   };
 
   const getUrgencyBadge = (requiredDateStr?: string) => {
@@ -690,6 +732,20 @@ export default function RequisitionListTable() {
                   const isApproved = req.status === "APPROVED";
                   const isConverted = req.status === "CONVERTED";
                   const isDraft = req.status === "DRAFT";
+                  const isRejected = req.status === "REJECTED";
+                  const isCancelled = req.status === "CANCELLED";
+
+                  // Status Lifecycle Rules:
+                  // Modifier: DRAFT ✅ OUI, SUBMITTED ✅ OUI*, APPROVED ❌ NON, REJECTED ❌ NON, CONVERTED ❌ NON
+                  const canEdit = isDraft || isPending;
+                  // Supprimer: DRAFT ✅ OUI, SUBMITTED ❌ NON, APPROVED ❌ NON, REJECTED ✅ OUI, CONVERTED ❌ NON, CANCELLED ✅ OUI
+                  const canDelete = isDraft || isRejected || isCancelled;
+                  // Soumettre: DRAFT ✅ OUI
+                  const canSubmit = isDraft;
+                  // Convertir: APPROVED ✅ OUI
+                  const canConvert = isApproved;
+                  // Annuler: DRAFT ✅ OUI, SUBMITTED ✅ OUI, APPROVED ✅ OUI, REJECTED ❌ NON, CONVERTED ❌ NON
+                  const canCancel = isDraft || isPending || isApproved;
 
                   return (
                     <React.Fragment key={req.id}>
@@ -814,7 +870,7 @@ export default function RequisitionListTable() {
                           <div className="flex items-center justify-end gap-1">
 
                             {/* If Approved: Convert to Purchase Order Button */}
-                            {isApproved && (
+                            {canConvert && (
                               <button
                                 type="button"
                                 onClick={() => setConvertToPoRequisition(req)}
@@ -829,7 +885,7 @@ export default function RequisitionListTable() {
                             )}
 
                             {/* If Draft: Quick Submit Button */}
-                            {isDraft && (
+                            {canSubmit && (
                               <button
                                 type="button"
                                 onClick={() => handleQuickSubmit(req)}
@@ -840,10 +896,24 @@ export default function RequisitionListTable() {
                               </button>
                             )}
 
+                            {/* If Cancellable (Draft, Submitted, Approved): Quick Cancel Button */}
+                            {canCancel && (
+                              <button
+                                type="button"
+                                onClick={() => setRequisitionToCancel(req)}
+                                className="p-1.5 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-amber-50 dark:text-gray-400 dark:hover:text-amber-400 dark:hover:bg-amber-500/15 transition-colors"
+                                title="Cancel Requisition"
+                              >
+                                <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                                </svg>
+                              </button>
+                            )}
+
                             {/* View Details Link */}
                             <Link
                               to={`/requisitions/view/${req.id}`}
-                              className="p-1.5 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-800 transition-colors"
+                              className="p-1.5 rounded-lg text-gray-500 hover:text-brand-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-brand-400 dark:hover:bg-gray-800 transition-colors"
                               title="View Details"
                             >
                               <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -852,12 +922,34 @@ export default function RequisitionListTable() {
                               </svg>
                             </Link>
 
-                            {/* Delete (if Draft or Cancelled) */}
-                            {(isDraft || req.status === "CANCELLED") && (
+                            {/* Edit Requisition Link (Draft & Submitted) or Locked Icon */}
+                            {canEdit ? (
+                              <Link
+                                to={`/requisitions/edit/${req.id}`}
+                                className="p-1.5 rounded-lg text-gray-500 hover:text-brand-600 hover:bg-brand-50 dark:text-gray-400 dark:hover:text-brand-400 dark:hover:bg-brand-500/15 transition-colors"
+                                title="Edit Requisition"
+                              >
+                                <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                              </Link>
+                            ) : (
+                              <span
+                                className="p-1.5 rounded-lg text-gray-300 dark:text-gray-600 cursor-not-allowed inline-flex items-center"
+                                title={`Locked: Requisition is in ${req.status} status and cannot be modified`}
+                              >
+                                <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                </svg>
+                              </span>
+                            )}
+
+                            {/* Delete Requisition (Draft, Rejected, Cancelled) */}
+                            {canDelete && (
                               <button
                                 type="button"
                                 onClick={() => setRequisitionToDelete(req)}
-                                className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-500/15 transition-colors"
+                                className="p-1.5 rounded-lg text-gray-500 hover:text-red-600 hover:bg-red-50 dark:text-gray-400 dark:hover:text-red-400 dark:hover:bg-red-500/15 transition-colors"
                                 title="Delete Requisition"
                               >
                                 <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -993,6 +1085,17 @@ export default function RequisitionListTable() {
         message={`Are you sure you want to delete requisition ${requisitionToDelete?.requisitionCode}? This action cannot be undone.`}
         isDeleting={isDeleting}
       />
+
+      {/* Cancel Confirmation Modal */}
+      {requisitionToCancel && (
+        <RequisitionCancelModal
+          isOpen={!!requisitionToCancel}
+          onClose={() => setRequisitionToCancel(null)}
+          requisition={requisitionToCancel}
+          onConfirm={handleCancelConfirm}
+          isLoading={isCancelling}
+        />
+      )}
     </div>
   );
 }

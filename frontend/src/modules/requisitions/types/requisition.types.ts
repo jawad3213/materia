@@ -1,10 +1,9 @@
 export * from './RequisitionStatus';
-export * from './RequisitionLineWebRequest';
-export * from './RequisitionLineWebResponse';
-export * from './CreateRequisitionWebRequest';
-export * from './UpdateRequisitionWebRequest';
-export * from './RequisitionSearchWebRequest';
-export * from './RequisitionWebResponse';
+export * from './RequisitionLine';
+export * from './CreateRequisitionRequest';
+export * from './UpdateRequisitionRequest';
+export * from './RequisitionSearchRequest';
+export * from './Requisition';
 export * from './RequisitionListItem';
 
 export type RequisitionFilterTab = 'ALL' | 'PENDING' | 'APPROVED' | 'CONVERTED' | 'DRAFT';

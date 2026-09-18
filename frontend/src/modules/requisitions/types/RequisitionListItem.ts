@@ -1,5 +1,5 @@
 import type { RequisitionStatus } from './RequisitionStatus';
-import type { RequisitionLineWebResponse } from './RequisitionLineWebResponse';
+import type { RequisitionLine } from './RequisitionLine';
 
 /**
  * Lightweight projection of a Requisition for list tables and cards.
@@ -21,5 +21,5 @@ export interface RequisitionListItem {
   purchaseOrderId?: string;
   purchaseOrderCode?: string;
   linesCount: number;
-  lines: RequisitionLineWebResponse[];
+  lines: RequisitionLine[];
 }

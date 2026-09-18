@@ -1,9 +1,11 @@
 import axiosClient from '../../../shared/api/axiosClient';
-import type { CreateRequisitionRequest } from '../types/CreateRequisitionRequest';
-import type { UpdateRequisitionRequest } from '../types/UpdateRequisitionRequest';
-import type { RequisitionSearchRequest } from '../types/RequisitionSearchRequest';
-import type { Requisition } from '../types/Requisition';
-import type { RequisitionStatus } from '../types/RequisitionStatus';
+import type {
+  CreateRequisitionRequest,
+  UpdateRequisitionRequest,
+  RequisitionSearchRequest,
+  Requisition,
+  RequisitionStatus,
+} from '../types';
 
 const BASE_URL = '/purchase-requisitions';
 
@@ -49,14 +51,23 @@ export const requisitionApi = {
       params: { keyword },
     }),
 
-  searchAdvanced: (criteria: RequisitionSearchRequest, page = 0, size = 10) =>
-    axiosClient.post<PageResponse<Requisition>>(`${BASE_URL}/search`, criteria, {
+  searchAdvanced: (criteria: RequisitionSearchRequest = {}, page = 0, size = 10) => {
+    // Strip empty strings so Jackson does not throw DateTimeParseException on empty date fields
+    const cleanedCriteria: Record<string, unknown> = {};
+    Object.entries(criteria || {}).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        cleanedCriteria[key] = value;
+      }
+    });
+
+    return axiosClient.post<PageResponse<Requisition>>(`${BASE_URL}/search`, cleanedCriteria, {
       params: { page, size },
-    }),
+    });
+  },
 
   // ---- Workflow Lifecycle Actions ----
   submit: (id: string, userId: string = 'current-user') =>
-    axiosClient.patch<Requisition>(`${BASE_URL}/${id}/submit`, null, {
+    axiosClient.patch<Requisition>(`${BASE_URL}/${id}/submit`, {}, {
       params: { userId },
     }),
 
@@ -66,7 +77,7 @@ export const requisitionApi = {
     approverName: string = 'Current Approver',
     notes?: string
   ) =>
-    axiosClient.patch<Requisition>(`${BASE_URL}/${id}/approve`, null, {
+    axiosClient.patch<Requisition>(`${BASE_URL}/${id}/approve`, {}, {
       params: { approverId, approverName, ...(notes ? { notes } : {}) },
     }),
 
@@ -76,12 +87,12 @@ export const requisitionApi = {
     approverId: string = 'current-approver',
     approverName: string = 'Current Approver'
   ) =>
-    axiosClient.patch<Requisition>(`${BASE_URL}/${id}/reject`, null, {
+    axiosClient.patch<Requisition>(`${BASE_URL}/${id}/reject`, {}, {
       params: { approverId, approverName, reason },
     }),
 
   cancel: (id: string, userId: string = 'current-user', reason?: string) =>
-    axiosClient.patch<Requisition>(`${BASE_URL}/${id}/cancel`, null, {
+    axiosClient.patch<Requisition>(`${BASE_URL}/${id}/cancel`, {}, {
       params: { userId, ...(reason ? { reason } : {}) },
     }),
 
@@ -91,7 +102,7 @@ export const requisitionApi = {
     purchaseOrderCode: string,
     userId: string = 'current-user'
   ) =>
-    axiosClient.patch<Requisition>(`${BASE_URL}/${id}/convert`, null, {
+    axiosClient.patch<Requisition>(`${BASE_URL}/${id}/convert`, {}, {
       params: { purchaseOrderId, purchaseOrderCode, userId },
     }),
 };

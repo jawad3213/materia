@@ -254,6 +254,14 @@ public class RequisitionService implements RequisitionUseCase {
         return mapper.toResponse(requisitionRepository.save(requisition));
     }
 
+    @Override
+    @Transactional
+    public RequisitionOutput cancel(UUID id, String userId, String reason) {
+        Requisition requisition = getEntityById(id);
+        requisition.cancel(userId, reason);
+        return mapper.toResponse(requisitionRepository.save(requisition));
+    }
+
     private Requisition getEntityById(UUID id) {
         return requisitionRepository.findById(id)
                 .orElseThrow(() -> new RequisitionNotFoundException(id));

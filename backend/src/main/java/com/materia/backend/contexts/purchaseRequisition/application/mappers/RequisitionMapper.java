@@ -93,12 +93,14 @@ public class RequisitionMapper implements BaseMapper<Requisition, CreateRequisit
         response.setSubmittedDate(entity.getSubmittedDate());
         response.setApprovedDate(entity.getApprovedDate());
         response.setConvertedDate(entity.getConvertedDate());
+        response.setCancelledDate(entity.getCancelledDate());
         response.setTotalAmount(entity.getTotalAmount());
         response.setCurrencyCode(entity.getCurrencyCode());
         response.setApproverId(entity.getApproverId());
         response.setApproverName(entity.getApproverName());
         response.setRejectionReason(entity.getRejectionReason());
         response.setApprovalNotes(entity.getApprovalNotes());
+        response.setCancellationReason(entity.getCancellationReason());
         response.setPurchaseOrderId(entity.getPurchaseOrderId());
         response.setPurchaseOrderCode(entity.getPurchaseOrderCode());
         response.setLines(copyLines(entity.getLines()));

@@ -1,4 +1,4 @@
-package com.materia.backend.contexts.purchaseRequisition.infrastructure.adapters.in.web.dtos.requisition;
+package com.materia.backend.contexts.purchaseRequisition.infrastructure.adapters.in.web.dtos.request;
 
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;

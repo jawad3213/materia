@@ -27,12 +27,14 @@ public class RequisitionOutput extends BaseOutput {
     private LocalDate submittedDate;
     private LocalDate approvedDate;
     private LocalDate convertedDate;
+    private LocalDate cancelledDate;
     private Money totalAmount;
     private String currencyCode;
     private String approverId;
     private String approverName;
     private String rejectionReason;
     private String approvalNotes;
+    private String cancellationReason;
     private String purchaseOrderId;
     private String purchaseOrderCode;
     private List<RequisitionLine> lines = new ArrayList<>();
@@ -137,6 +139,14 @@ public class RequisitionOutput extends BaseOutput {
         this.convertedDate = convertedDate;
     }
 
+    public LocalDate getCancelledDate() {
+        return cancelledDate;
+    }
+
+    public void setCancelledDate(LocalDate cancelledDate) {
+        this.cancelledDate = cancelledDate;
+    }
+
     public Money getTotalAmount() {
         return totalAmount;
     }
@@ -183,6 +193,14 @@ public class RequisitionOutput extends BaseOutput {
 
     public void setApprovalNotes(String approvalNotes) {
         this.approvalNotes = approvalNotes;
+    }
+
+    public String getCancellationReason() {
+        return cancellationReason;
+    }
+
+    public void setCancellationReason(String cancellationReason) {
+        this.cancellationReason = cancellationReason;
     }
 
     public String getPurchaseOrderId() {

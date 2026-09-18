@@ -5,6 +5,8 @@ export { default as RequisitionsRoutes } from "./RequisitionsRoutes";
 export { default as RequisitionsPage } from "./pages/RequisitionsPage";
 export { default as CreateRequisitionPage } from "./pages/CreateRequisitionPage";
 export { default as CreateRequisitionForm } from "./components/CreateRequisitionForm";
+export { default as RequisitionDetailPage } from "./pages/RequisitionDetailPage";
+export { default as RequisitionDetail } from "./components/RequisitionDetail";
 export { default as RequisitionListTable } from "./components/RequisitionListTable";
 export { default as RequisitionStatusBadge } from "./components/RequisitionStatusBadge";
 export { default as RequisitionStatCards } from "./components/RequisitionStatCards";

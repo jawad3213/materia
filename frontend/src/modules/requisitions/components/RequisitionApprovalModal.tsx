@@ -9,6 +9,7 @@ interface RequisitionApprovalModalProps {
   requisition: Requisition | null;
   mode: "APPROVE" | "REJECT";
   onConfirm: (notesOrReason: string) => Promise<void>;
+  isLoading?: boolean;
 }
 
 export default function RequisitionApprovalModal({
@@ -17,9 +18,11 @@ export default function RequisitionApprovalModal({
   requisition,
   mode,
   onConfirm,
+  isLoading = false,
 }: RequisitionApprovalModalProps) {
   const [comment, setComment] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [internalSubmitting, setInternalSubmitting] = useState(false);
+  const isSubmitting = isLoading || internalSubmitting;
   const [error, setError] = useState("");
 
   if (!requisition) return null;
@@ -34,7 +37,7 @@ export default function RequisitionApprovalModal({
     }
 
     try {
-      setIsSubmitting(true);
+      setInternalSubmitting(true);
       setError("");
       await onConfirm(comment.trim());
       setComment("");
@@ -42,7 +45,7 @@ export default function RequisitionApprovalModal({
     } catch (err: any) {
       setError(err?.response?.data?.message || err?.message || "Operation failed.");
     } finally {
-      setIsSubmitting(false);
+      setInternalSubmitting(false);
     }
   };
 

@@ -12,24 +12,23 @@ public class ExchangeRateProperties {
 
     /**
      * Provider API base URL for ExchangeRate-API v6.
-     * Default: https://v6.exchangerate-api.com/v6
      */
-    private String baseUrl = "https://v6.exchangerate-api.com/v6";
+    private String baseUrl;
 
     /**
-     * API key for ExchangeRate-API (injected from application.properties or EXCHANGE_API_KEY).
+     * API key for ExchangeRate-API (injected from application.properties via .env EXCHANGE_API_KEY).
      */
-    private String apiKey = "";
+    private String apiKey;
 
     /**
-     * Cache Time-To-Live in minutes. Default is 60 minutes.
+     * Cache Time-To-Live in minutes.
      */
-    private int cacheTtlMinutes = 60;
+    private int cacheTtlMinutes;
 
     /**
      * HTTP connection and response timeout in milliseconds.
      */
-    private int timeoutMs = 5000;
+    private int timeoutMs;
 
     public String getBaseUrl() {
         return baseUrl;

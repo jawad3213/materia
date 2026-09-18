@@ -4,7 +4,7 @@ import { requisitionApi } from "../services/requisitionApi";
 import { materialApi } from "../../materials/services/materialApi";
 import { supplierApi } from "../../suppliers/services/supplierApi";
 import type { CreateRequisitionRequest } from "../types/CreateRequisitionRequest";
-import type { RequisitionLineWebRequest } from "../types/RequisitionLineWebRequest";
+import type { RequisitionLineRequest } from "../types/RequisitionLine";
 import type { MaterialListItem } from "../../materials/types/MaterialListItem";
 import type { SupplierListItem } from "../../suppliers/types/SupplierListItem";
 
@@ -17,7 +17,7 @@ import Toast from "../../../shared/components/ui/notifications/Toast";
 import Badge from "../../../shared/components/ui/badge/Badge";
 import { useCurrencyConverter } from "../../../shared/hooks";
 
-interface LocalLineItem extends RequisitionLineWebRequest {
+interface LocalLineItem extends RequisitionLineRequest {
   tempId: string;
   materialName?: string;
   unitOfMeasure?: string;
@@ -28,8 +28,50 @@ interface LocalLineItem extends RequisitionLineWebRequest {
   exchangeRateUsed?: number;
 }
 
-export default function CreateRequisitionForm() {
+import type { UpdateRequisitionRequest } from "../types/UpdateRequisitionRequest";
+
+const parseNumericAmount = (val: unknown): number => {
+  if (val === undefined || val === null) return 0;
+  if (typeof val === "number") return isNaN(val) ? 0 : val;
+  const str = String(val).trim();
+  let cleaned = str.replace(/[^0-9.,-]+/g, "");
+  if (cleaned.includes(",") && cleaned.includes(".")) {
+    if (cleaned.indexOf(",") < cleaned.indexOf(".")) {
+      cleaned = cleaned.replace(/,/g, "");
+    } else {
+      cleaned = cleaned.replace(/\./g, "").replace(/,/g, ".");
+    }
+  } else if (cleaned.includes(",")) {
+    cleaned = cleaned.replace(/,/g, ".");
+  }
+  const num = parseFloat(cleaned);
+  return isNaN(num) ? 0 : num;
+};
+
+const extractCurrency = (val: unknown, fallback: string = "MAD"): string => {
+  if (!val) return fallback;
+  const s = String(val).toUpperCase();
+  if (s.includes("EUR") || s.includes("€") || s.includes("â‚¬") || s.includes("\u20AC")) return "EUR";
+  if (s.includes("USD") || s.includes("$")) return "USD";
+  if (s.includes("MAD") || s.includes("DH") || s.includes("DIRHAM")) return "MAD";
+  return fallback;
+};
+
+interface CreateRequisitionFormProps {
+  requisitionId?: string;
+}
+
+export default function CreateRequisitionForm({ requisitionId }: CreateRequisitionFormProps = {}) {
   const navigate = useNavigate();
+  const isEditMode = Boolean(requisitionId);
+  const [isLoadingExisting, setIsLoadingExisting] = useState(false);
+  const [existingStatus, setExistingStatus] = useState<string | null>(null);
+  const isReadOnly = Boolean(
+    isEditMode &&
+    existingStatus &&
+    existingStatus !== "DRAFT" &&
+    existingStatus !== "SUBMITTED"
+  );
 
   const [materials, setMaterials] = useState<MaterialListItem[]>([]);
   const [suppliers, setSuppliers] = useState<SupplierListItem[]>([]);
@@ -122,6 +164,78 @@ export default function CreateRequisitionForm() {
     loadCatalogs();
   }, []);
 
+  // Load existing requisition if in edit mode
+  useEffect(() => {
+    if (!requisitionId) return;
+
+    const loadExistingRequisition = async () => {
+      try {
+        setIsLoadingExisting(true);
+        const res = await requisitionApi.getById(requisitionId);
+        const req = res.data;
+        if (req) {
+          setExistingStatus(req.status || null);
+          const reqCurr = extractCurrency(req.currencyCode, "MAD");
+          setFormData({
+            title: req.title || "",
+            description: req.description || "",
+            justification: req.justification || "",
+            requesterName: req.requesterName || "Ahmed Bennani",
+            requiredDate: req.requiredDate || "",
+            currencyCode: reqCurr,
+          });
+
+          if (req.lines && req.lines.length > 0) {
+            setLines(
+              req.lines.map((l) => {
+                const unitPriceNum = parseNumericAmount(l.unitPrice || l.standardPrice);
+                const qtyNum = Math.max(1, Number(l.quantity) || 1);
+                const lineTotalNum =
+                  parseNumericAmount(l.lineTotal) ||
+                  Math.round(qtyNum * unitPriceNum * 100) / 100;
+                const lineCurr = extractCurrency(
+                  l.currencyCodeLine || l.currencyCode,
+                  reqCurr
+                );
+
+                return {
+                  id: l.id,
+                  tempId: crypto.randomUUID(),
+                  materialId: l.materialId || "",
+                  materialCode: l.materialCode || "",
+                  materialName: l.materialName || "",
+                  quantity: qtyNum,
+                  unitOfMeasure: l.unitOfMeasure || "PCS",
+                  estimatedUnitPrice: unitPriceNum,
+                  lineTotal: lineTotalNum,
+                  originalPrice: unitPriceNum,
+                  originalCurrency: lineCurr,
+                  exchangeRateUsed: 1,
+                  requiredDate: l.requiredDate || req.requiredDate || "",
+                  supplierId: l.supplierId || "",
+                  supplierCode: l.supplierCode || "",
+                  notes: l.notes || "",
+                  deliveryTerms: l.deliveryTerms || "",
+                  storageLocation: l.storageLocation || "",
+                };
+              })
+            );
+          }
+        }
+      } catch (err: any) {
+        console.error("Failed to load requisition for editing:", err);
+        setSubmitMessage({
+          type: "error",
+          text: err?.response?.data?.message || "Failed to load requisition for editing.",
+        });
+      } finally {
+        setIsLoadingExisting(false);
+      }
+    };
+
+    loadExistingRequisition();
+  }, [requisitionId]);
+
   // Close material searchable dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -138,17 +252,24 @@ export default function CreateRequisitionForm() {
   useEffect(() => {
     setLines((prevLines) =>
       prevLines.map((line) => {
-        if (line.originalPrice && line.originalCurrency) {
+        const rawOrigPrice =
+          line.originalPrice !== undefined && line.originalPrice !== null
+            ? parseNumericAmount(line.originalPrice)
+            : parseNumericAmount(line.estimatedUnitPrice);
+        const origCurr = line.originalCurrency || formData.currencyCode;
+
+        if (rawOrigPrice > 0) {
           const { converted, rate } = convertToTarget(
-            line.originalPrice,
-            line.originalCurrency,
+            rawOrigPrice,
+            origCurr,
             formData.currencyCode
           );
+          const safeConverted = isNaN(converted) ? rawOrigPrice : converted;
           const qty = line.quantity || 1;
           return {
             ...line,
-            estimatedUnitPrice: converted,
-            lineTotal: qty * converted,
+            estimatedUnitPrice: safeConverted,
+            lineTotal: Math.round(qty * safeConverted * 100) / 100,
             exchangeRateUsed: rate,
           };
         }
@@ -187,21 +308,21 @@ export default function CreateRequisitionForm() {
             updated.materialName = selectedMat.name;
             updated.unitOfMeasure = selectedMat.unitOfMeasure || "PCS";
 
-            const rawPrice =
-              typeof selectedMat.standardPrice === "number"
-                ? selectedMat.standardPrice
-                : parseFloat(
-                    String(selectedMat.standardPrice || "0").replace(/[^0-9.-]+/g, "")
-                  ) || 0;
-            const matCurrency = selectedMat.standardPriceCurrency || selectedMat.currencyCode || "MAD";
+            const rawPrice = parseNumericAmount(selectedMat.standardPrice);
+            const matCurrency = extractCurrency(
+              selectedMat.standardPriceCurrency || selectedMat.currencyCode,
+              formData.currencyCode || "MAD"
+            );
             const { converted, rate } = convertToTarget(
               rawPrice,
               matCurrency,
               formData.currencyCode
             );
+            const safeConverted = isNaN(converted) ? rawPrice : converted;
+            const lineQty = Math.max(1, Number(updated.quantity) || 1);
 
-            updated.estimatedUnitPrice = converted;
-            updated.lineTotal = (updated.quantity || 1) * converted;
+            updated.estimatedUnitPrice = safeConverted;
+            updated.lineTotal = Math.round(lineQty * safeConverted * 100) / 100;
             updated.originalPrice = rawPrice;
             updated.originalCurrency = matCurrency;
             updated.exchangeRateUsed = rate;
@@ -227,12 +348,22 @@ export default function CreateRequisitionForm() {
 
         // Recalculate line total if quantity or price changes
         if (field === "quantity" || field === "estimatedUnitPrice") {
-          const qty = field === "quantity" ? Number(value) : line.quantity || 0;
-          const price =
-            field === "estimatedUnitPrice"
-              ? Number(value)
-              : line.estimatedUnitPrice || 0;
-          updated.lineTotal = Math.max(0, qty * price);
+          const qty =
+            field === "quantity"
+              ? Math.max(0, parseInt(String(value), 10) || 0)
+              : Math.max(0, Number(line.quantity) || 0);
+          const price = parseNumericAmount(
+            field === "estimatedUnitPrice" ? value : line.estimatedUnitPrice
+          );
+          updated.quantity = qty;
+          updated.estimatedUnitPrice = price;
+          updated.lineTotal = Math.round(qty * price * 100) / 100;
+
+          if (field === "estimatedUnitPrice") {
+            updated.originalPrice = price;
+            updated.originalCurrency = formData.currencyCode;
+            updated.exchangeRateUsed = 1;
+          }
         }
 
         return updated;
@@ -274,7 +405,7 @@ export default function CreateRequisitionForm() {
   };
 
   const totalRequisitionAmount = lines.reduce(
-    (sum, l) => sum + (l.lineTotal || 0),
+    (sum, l) => sum + parseNumericAmount(l.lineTotal),
     0
   );
 
@@ -387,6 +518,7 @@ export default function CreateRequisitionForm() {
               : undefined;
 
           return {
+            id: l.id || undefined,
             materialId: matId,
             materialCode: matCode,
             quantity: Math.max(1, Number(l.quantity) || 1),
@@ -403,6 +535,28 @@ export default function CreateRequisitionForm() {
           };
         }),
       };
+
+      if (isEditMode && requisitionId) {
+        const updatePayload: UpdateRequisitionRequest = {
+          title: effectiveTitle,
+          description: formData.description.trim() || undefined,
+          justification: formData.justification.trim() || undefined,
+          requiredDate: formData.requiredDate ? formData.requiredDate.trim() : undefined,
+          currencyCode: formData.currencyCode.trim() || "MAD",
+          updatedBy: effectiveRequester,
+          lines: payload.lines,
+        };
+        const res = await requisitionApi.update(requisitionId, updatePayload);
+        const code = res.data?.requisitionCode || "";
+        setSubmitMessage({
+          type: "success",
+          text: `Purchase Requisition ${code} updated successfully!`,
+        });
+        setTimeout(() => {
+          navigate(`/requisitions/view/${requisitionId}`);
+        }, 1200);
+        return true;
+      }
 
       const res = await requisitionApi.create(payload);
 
@@ -444,6 +598,17 @@ export default function CreateRequisitionForm() {
     handleSave(false);
   };
 
+  if (isLoadingExisting) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-3">
+        <div className="size-8 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
+        <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">
+          Loading requisition for editing...
+        </span>
+      </div>
+    );
+  }
+
   return (
     <div className="relative">
       {/* Toast Alert Notification */}
@@ -458,6 +623,26 @@ export default function CreateRequisitionForm() {
       )}
 
       <form onSubmit={handleSubmit}>
+        {/* Guard for non-modifiable requisitions (Only DRAFT and SUBMITTED can be edited) */}
+        {isEditMode && existingStatus && existingStatus !== "DRAFT" && existingStatus !== "SUBMITTED" && (
+          <div className="mb-6 p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 dark:bg-amber-950/30 dark:border-amber-500/30 dark:text-amber-200 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="size-9 rounded-xl bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center flex-shrink-0">
+                <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-xs font-bold">This requisition is in {existingStatus} status and cannot be modified.</p>
+                <p className="text-[11px] text-amber-700 dark:text-amber-300 mt-0.5">Per procurement lifecycle policy, only DRAFT and SUBMITTED requisitions can be edited.</p>
+              </div>
+            </div>
+            <Button size="sm" variant="outline" type="button" onClick={() => navigate(`/requisitions/view/${requisitionId}`)}>
+              View Details
+            </Button>
+          </div>
+        )}
+
         <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-white/[0.07] dark:bg-gray-900">
           {/* Section 1: General Header Details */}
           <div className="mb-8">
@@ -486,6 +671,7 @@ export default function CreateRequisitionForm() {
                   name="title"
                   value={formData.title}
                   onChange={handleHeaderChange}
+                  disabled={isReadOnly}
                   placeholder="e.g. Q4 Raw Material Replenishment - Steel Sheets"
                   error={!!fieldErrors.title}
                 />
@@ -503,6 +689,7 @@ export default function CreateRequisitionForm() {
                     setFormData((prev) => ({ ...prev, justification: val }))
                   }
                   rows={2}
+                  disabled={isReadOnly}
                   placeholder="e.g. Current safety stock below critical threshold. Needed for ongoing production line."
                 />
               </div>
@@ -515,6 +702,7 @@ export default function CreateRequisitionForm() {
                   name="requesterName"
                   value={formData.requesterName}
                   onChange={handleHeaderChange}
+                  disabled={isReadOnly}
                   placeholder="e.g. Ahmed Bennani"
                   error={!!fieldErrors.requesterName}
                 />
@@ -530,6 +718,7 @@ export default function CreateRequisitionForm() {
                   name="requiredDate"
                   value={formData.requiredDate}
                   onChange={handleHeaderChange}
+                  disabled={isReadOnly}
                 />
               </div>
 
@@ -539,7 +728,12 @@ export default function CreateRequisitionForm() {
                   name="currencyCode"
                   value={formData.currencyCode}
                   onChange={handleHeaderChange}
-                  className="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                  disabled={isReadOnly}
+                  className={`h-11 w-full rounded-lg border px-4 py-2.5 text-sm transition-colors ${
+                    isReadOnly
+                      ? "border-gray-300 bg-gray-100 text-gray-500 cursor-not-allowed dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400"
+                      : "border-gray-300 bg-transparent text-gray-800 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
+                  }`}
                 >
                   <option value="MAD">MAD - Moroccan Dirham</option>
                   <option value="USD">USD - US Dollar</option>
@@ -568,19 +762,21 @@ export default function CreateRequisitionForm() {
                 </div>
               </div>
 
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleAddLine}
-              >
-                <span className="flex items-center gap-1.5 text-xs font-semibold">
-                  <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
-                  Add Material Line
-                </span>
-              </Button>
+              {!isReadOnly && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAddLine}
+                >
+                  <span className="flex items-center gap-1.5 text-xs font-semibold">
+                    <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    Add Material Line
+                  </span>
+                </Button>
+              )}
             </div>
 
             {/* Line Items Container */}
@@ -600,7 +796,7 @@ export default function CreateRequisitionForm() {
                       </span>
                     </div>
 
-                    {lines.length > 1 && (
+                    {!isReadOnly && lines.length > 1 && (
                       <button
                         type="button"
                         onClick={() => handleRemoveLine(line.tempId)}
@@ -645,14 +841,18 @@ export default function CreateRequisitionForm() {
                             {/* Trigger Button / Display */}
                             <button
                               type="button"
+                              disabled={isReadOnly}
                               onClick={() => {
+                                if (isReadOnly) return;
                                 setOpenMaterialDropdownId(
                                   isDropdownOpen ? null : line.tempId
                                 );
                                 setMaterialSearchQuery("");
                               }}
                               className={`h-11 w-full flex items-center justify-between rounded-lg border px-3.5 py-2 text-left text-sm shadow-theme-xs transition-all focus:outline-hidden focus:ring-3 ${
-                                fieldErrors[`line_${index}_material`]
+                                isReadOnly
+                                  ? "border-gray-300 bg-gray-100/80 cursor-not-allowed text-gray-500 dark:border-gray-700 dark:bg-gray-800/80 dark:text-gray-400"
+                                  : fieldErrors[`line_${index}_material`]
                                   ? "border-error-500 bg-transparent text-gray-800 focus:border-error-300 focus:ring-error-500/20 dark:border-error-500 dark:text-error-400"
                                   : isDropdownOpen
                                   ? "border-brand-500 ring-3 ring-brand-500/20 bg-white dark:bg-gray-900 dark:border-brand-400"
@@ -682,20 +882,22 @@ export default function CreateRequisitionForm() {
                                   </span>
                                 )}
                               </div>
-                              <svg
-                                className={`size-4 text-gray-400 transition-transform duration-200 ${
-                                  isDropdownOpen ? "rotate-180 text-brand-500" : ""
-                                }`}
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                              >
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                              </svg>
+                              {!isReadOnly && (
+                                <svg
+                                  className={`size-4 text-gray-400 transition-transform duration-200 ${
+                                    isDropdownOpen ? "rotate-180 text-brand-500" : ""
+                                  }`}
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                >
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
+                              )}
                             </button>
 
                             {/* Dropdown Menu with Search Input */}
-                            {isDropdownOpen && (
+                            {!isReadOnly && isDropdownOpen && (
                               <div className="absolute z-50 mt-1.5 w-full rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
                                 {/* Search Box */}
                                 <div className="p-2.5 border-b border-gray-100 dark:border-gray-800 bg-gray-50/70 dark:bg-gray-800/40">
@@ -789,6 +991,7 @@ export default function CreateRequisitionForm() {
                       <Input
                         type="number"
                         min="1"
+                        disabled={isReadOnly}
                         value={line.quantity}
                         onChange={(e) =>
                           handleLineChange(
@@ -812,12 +1015,17 @@ export default function CreateRequisitionForm() {
                       <Input
                         type="number"
                         step={0.01}
-                        value={line.estimatedUnitPrice || ""}
+                        disabled={isReadOnly}
+                        value={
+                          line.estimatedUnitPrice !== undefined && line.estimatedUnitPrice !== null
+                            ? line.estimatedUnitPrice
+                            : ""
+                        }
                         onChange={(e) =>
                           handleLineChange(
                             line.tempId,
                             "estimatedUnitPrice",
-                            parseFloat(e.target.value) || 0
+                            e.target.value === "" ? 0 : parseFloat(e.target.value) || 0
                           )
                         }
                         placeholder="0.00"
@@ -827,10 +1035,10 @@ export default function CreateRequisitionForm() {
                         line.originalPrice !== undefined && line.originalPrice > 0 && (
                           <div className="mt-1 flex flex-col gap-0.5">
                             <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-500/20">
-                              <span>Orig: {line.originalPrice.toFixed(2)} {line.originalCurrency}</span>
+                              <span>Orig: {parseNumericAmount(line.originalPrice).toFixed(2)} {line.originalCurrency}</span>
                               {line.exchangeRateUsed && (
                                 <span className="text-gray-500 dark:text-gray-400 font-normal">
-                                  (@ {line.exchangeRateUsed.toFixed(4)})
+                                  (@ {Number(line.exchangeRateUsed).toFixed(4)})
                                 </span>
                               )}
                             </span>
@@ -845,7 +1053,7 @@ export default function CreateRequisitionForm() {
                         {new Intl.NumberFormat("en-US", {
                           minimumFractionDigits: 2,
                           maximumFractionDigits: 2,
-                        }).format(line.lineTotal || 0)}{" "}
+                        }).format(parseNumericAmount(line.lineTotal))}{" "}
                         {formData.currencyCode}
                       </div>
                     </div>
@@ -866,7 +1074,7 @@ export default function CreateRequisitionForm() {
                           <div className="relative">
                             <select
                               value={line.supplierId}
-                              disabled={!!selectedMat?.supplierId}
+                              disabled={isReadOnly || !!selectedMat?.supplierId}
                               onChange={(e) => {
                                 const supId = e.target.value;
                                 const sup = suppliers.find((s) => s.id === supId);
@@ -878,8 +1086,8 @@ export default function CreateRequisitionForm() {
                                 );
                               }}
                               className={`h-11 w-full appearance-none rounded-lg border px-4 py-2.5 pr-10 text-sm shadow-theme-xs transition-all focus:outline-hidden focus:ring-3 ${
-                                selectedMat?.supplierId
-                                  ? "border-gray-300 bg-gray-100/80 cursor-not-allowed text-gray-700 font-medium dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
+                                isReadOnly || selectedMat?.supplierId
+                                  ? "border-gray-300 bg-gray-100/80 cursor-not-allowed text-gray-500 font-medium dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400"
                                   : "border-gray-300 bg-white text-gray-800 focus:border-brand-300 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90"
                               }`}
                             >
@@ -907,6 +1115,7 @@ export default function CreateRequisitionForm() {
                       <Label>Line Notes / Delivery Terms</Label>
                       <Input
                         type="text"
+                        disabled={isReadOnly}
                         value={line.notes || ""}
                         onChange={(e) =>
                           handleLineChange(line.tempId, "notes", e.target.value)
@@ -943,7 +1152,7 @@ export default function CreateRequisitionForm() {
                   {new Intl.NumberFormat("en-US", {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
-                  }).format(totalRequisitionAmount)}{" "}
+                  }).format(parseNumericAmount(totalRequisitionAmount))}{" "}
                   {formData.currencyCode}
                 </span>
               </div>
@@ -962,48 +1171,61 @@ export default function CreateRequisitionForm() {
             </Button>
 
             <div className="flex items-center gap-3">
-              {/* Save as Draft Button */}
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => handleSave(true)}
-                disabled={isSubmitting || isSavingDraft}
-                className="border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
-              >
-                {isSavingDraft ? (
-                  <span className="flex items-center gap-2">
-                    <svg className="size-4 animate-spin text-gray-500" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                    Saving Draft...
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1.5">
-                    <svg className="size-4 text-gray-500 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-                    </svg>
-                    Save as Draft
-                  </span>
-                )}
-              </Button>
+              {/* Save as Draft Button (Only when not read-only) */}
+              {!isReadOnly && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => handleSave(true)}
+                  disabled={isSubmitting || isSavingDraft}
+                  className="border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+                >
+                  {isSavingDraft ? (
+                    <span className="flex items-center gap-2">
+                      <svg className="size-4 animate-spin text-gray-500" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Saving Draft...
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1.5">
+                      <svg className="size-4 text-gray-500 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                      </svg>
+                      Save as Draft
+                    </span>
+                  )}
+                </Button>
+              )}
 
-              {/* Primary Create Requisition (Submits) */}
-              <Button type="submit" disabled={isSubmitting || isSavingDraft}>
+              {/* Primary Create / Update Requisition (Submits) */}
+              <Button
+                type="submit"
+                disabled={isSubmitting || isSavingDraft || isReadOnly}
+                className={isReadOnly ? "bg-gray-400 hover:bg-gray-400 cursor-not-allowed text-white dark:bg-gray-700 dark:text-gray-400" : ""}
+              >
                 {isSubmitting ? (
                   <span className="flex items-center gap-2">
                     <svg className="size-4 animate-spin text-white" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                     </svg>
-                    Submitting Requisition...
+                    {isEditMode ? "Updating Requisition..." : "Submitting Requisition..."}
+                  </span>
+                ) : isReadOnly ? (
+                  <span className="flex items-center gap-1.5">
+                    <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                    Modification Locked ({existingStatus})
                   </span>
                 ) : (
                   <span className="flex items-center gap-1.5">
                     <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
-                    Create Requisition
+                    {isEditMode ? "Update Requisition" : "Create Requisition"}
                   </span>
                 )}
               </Button>
